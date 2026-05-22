@@ -17,13 +17,10 @@ io.on("connection", (socket) => {
 
 setSocketServer(io);
 
-connectDb()
-  .then(() => {
-    server.listen(env.port, () => {
-      console.log(`Flipzon API listening on http://localhost:${env.port}`);
-    });
-  })
-  .catch((error) => {
-    console.error("Database connection failed", error);
-    process.exit(1);
-  });
+server.listen(env.port, () => {
+  console.log(`Flipzon API listening on http://localhost:${env.port}`);
+});
+
+connectDb().catch((error) => {
+  console.error("Database connection failed. API docs remain available; database routes need MongoDB.", error);
+});

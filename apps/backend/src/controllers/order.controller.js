@@ -94,3 +94,33 @@ export const myOrders = asyncHandler(async (req, res) => {
   const orders = await Order.find({ user: req.user._id }).populate("items.product").sort("-createdAt");
   res.json({ orders });
 });
+
+export const trackOrder = async (req, res) => {
+  try {
+      const { riderLat, riderLng, customerLat, customerLng } = req.body;
+
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+
+      const url = `https://maps.googleapis.com/maps/api/distancematrix/json`;
+
+      const response = await axios.get(url, {
+        params: {
+          origins: `${riderLat},${riderLng}`,
+          destinations: `${customerLat},${customerLng}`,
+          mode: "driving",
+          key: apiKey,
+        },
+      });
+
+      const element = response.data.rows[0].elements[0];
+
+      return res.json({
+        distance: element.distance.text,
+        duration: element.duration.text,
+        etaSeconds: element.duration.value,
+      });
+  }catch (error) {
+    res.status(500);
+    throw new Error("Tracking service unavailable");
+  }
+}

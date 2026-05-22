@@ -5,3 +5,4 @@ dist
 uploads
 coverage
 npm-debug.log*
+docs/swagger.yml

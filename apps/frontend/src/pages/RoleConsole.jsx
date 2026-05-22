@@ -21,7 +21,7 @@ export default function RoleConsole() {
             <p>{user ? `${role.replace("_", " ")} workspace` : "User workspace"}</p>
             <h1>{user ? `Welcome, ${user.name}` : "Login as user first"}</h1>
           </div>
-          <Link className="secondaryButton" to="/">Back to shop</Link>
+          {role === "user" && <Link className="secondaryButton" to="/">Back to shop</Link>}
         </div>
 
         {!user && (
