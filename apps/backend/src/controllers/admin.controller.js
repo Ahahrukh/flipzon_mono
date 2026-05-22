@@ -1,5 +1,7 @@
 import Offer from "../models/Offer.js";
+import Order from "../models/Order.js";
 import Product from "../models/Product.js";
+import Ticket from "../models/Ticket.js";
 import User from "../models/User.js";
 import WithdrawalRequest from "../models/WithdrawalRequest.js";
 import { notify } from "../services/notification.service.js";
@@ -19,6 +21,62 @@ export const adminProducts = asyncHandler(async (req, res) => {
 export const sellers = asyncHandler(async (_req, res) => {
   const sellersList = await User.find({ role: "seller" }).select("-passwordHash -otp").sort("-createdAt");
   res.json({ sellers: sellersList });
+});
+
+export const users = asyncHandler(async (req, res) => {
+  const { role } = req.query;
+  const filter = role ? { role } : {};
+  const usersList = await User.find(filter).select("-passwordHash -otp").sort("-createdAt");
+  res.json({ users: usersList });
+});
+
+export const deliveryPartners = asyncHandler(async (_req, res) => {
+  const partners = await User.find({ role: "delivery_partner" }).select("-passwordHash -otp").sort("-createdAt");
+  res.json({ partners });
+});
+
+export const adminOrders = asyncHandler(async (req, res) => {
+  const { status, paymentStatus } = req.query;
+  const filter = {};
+  if (status) filter["delivery.status"] = status;
+  if (paymentStatus) filter["payment.status"] = paymentStatus;
+  const orders = await Order.find(filter)
+    .populate("user", "name email phone")
+    .populate("delivery.partner", "name phone")
+    .populate("items.product", "name")
+    .sort("-createdAt");
+  res.json({ orders });
+});
+
+export const assignDeliveryPartner = asyncHandler(async (req, res) => {
+  const partner = await User.findOne({ _id: req.body.partnerId, role: "delivery_partner", isActive: true });
+  if (!partner) {
+    res.status(404);
+    throw new Error("Delivery partner not found");
+  }
+  const order = await Order.findByIdAndUpdate(
+    req.params.id,
+    { "delivery.partner": partner._id, "delivery.status": "out_for_delivery" },
+    { new: true }
+  );
+  if (!order) {
+    res.status(404);
+    throw new Error("Order not found");
+  }
+  await notify({
+    recipient: partner._id,
+    title: "New delivery assigned",
+    message: `Order ${order._id} is assigned to you.`,
+    data: { orderId: order._id }
+  });
+  res.json({ order });
+});
+
+export const adminTickets = asyncHandler(async (req, res) => {
+  const { status } = req.query;
+  const filter = status ? { status } : {};
+  const tickets = await Ticket.find(filter).populate("user", "name email phone").populate("order", "total delivery.status").sort("-createdAt");
+  res.json({ tickets });
 });
 
 export const updateSellerStatus = asyncHandler(async (req, res) => {

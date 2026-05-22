@@ -63,19 +63,32 @@ function UserConsole({ user }) {
 }
 
 function AdminConsole({ token, setMessage }) {
+  const [tab, setTab] = useState("dashboard");
+  const [users, setUsers] = useState([]);
   const [products, setProducts] = useState([]);
   const [sellers, setSellers] = useState([]);
+  const [partners, setPartners] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [tickets, setTickets] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
   const [offer, setOffer] = useState({ title: "", code: "", discountValue: 10 });
 
   const load = async () => {
-    const [productData, sellerData, withdrawalData] = await Promise.all([
+    const [userData, productData, sellerData, partnerData, orderData, ticketData, withdrawalData] = await Promise.all([
+      apiRequest("/admin/users", { token }),
       apiRequest("/admin/products", { token }),
       apiRequest("/admin/sellers", { token }),
+      apiRequest("/admin/delivery-partners", { token }),
+      apiRequest("/admin/orders", { token }),
+      apiRequest("/admin/tickets", { token }),
       apiRequest("/admin/withdrawals", { token })
     ]);
+    setUsers(userData.users || []);
     setProducts(productData.products || []);
     setSellers(sellerData.sellers || []);
+    setPartners(partnerData.partners || []);
+    setOrders(orderData.orders || []);
+    setTickets(ticketData.tickets || []);
     setWithdrawals(withdrawalData.withdrawals || []);
   };
 
@@ -105,44 +118,63 @@ function AdminConsole({ token, setMessage }) {
   };
 
   return (
-    <div className="opsGrid">
-      <article className="opsPanel">
-        <h2>Product audit</h2>
-        <p>{products.length} products across sellers</p>
-        <div className="opsList">
-          {products.slice(0, 6).map((product) => (
-            <span key={product._id}>{product.name} · {money(product.price)} · {product.status}</span>
-          ))}
+    <>
+      <div className="sellerTabs">
+        {["dashboard", "users", "sellers", "delivery", "products", "orders", "tickets", "offers", "withdrawals"].map((item) => (
+          <button className={tab === item ? "active" : ""} key={item} onClick={() => setTab(item)}>{item}</button>
+        ))}
+      </div>
+      {tab === "dashboard" && (
+        <div className="opsGrid">
+          <article className="opsPanel"><h2>Users</h2><p>{users.length}</p></article>
+          <article className="opsPanel"><h2>Sellers</h2><p>{sellers.length}</p></article>
+          <article className="opsPanel"><h2>Products</h2><p>{products.length}</p></article>
+          <article className="opsPanel"><h2>Orders</h2><p>{orders.length}</p></article>
+          <article className="opsPanel"><h2>Tickets</h2><p>{tickets.length}</p></article>
+          <article className="opsPanel"><h2>Withdrawals</h2><p>{withdrawals.length}</p></article>
         </div>
-      </article>
-      <article className="opsPanel">
-        <h2>Seller control</h2>
-        <div className="opsList">
-          {sellers.map((seller) => (
-            <button key={seller._id} onClick={() => toggleSeller(seller)}>
-              {seller.name} · {seller.isActive ? "Disable" : "Enable"}
-            </button>
-          ))}
-          {sellers.length === 0 && <span>No sellers yet.</span>}
-        </div>
-      </article>
-      <form className="opsPanel" onSubmit={createOffer}>
-        <h2>Create offer</h2>
-        <input value={offer.title} onChange={(e) => setOffer((current) => ({ ...current, title: e.target.value }))} placeholder="Offer title" required />
-        <input value={offer.code} onChange={(e) => setOffer((current) => ({ ...current, code: e.target.value }))} placeholder="Code" required />
-        <input type="number" value={offer.discountValue} onChange={(e) => setOffer((current) => ({ ...current, discountValue: Number(e.target.value) }))} />
-        <button className="primaryButton">Create offer</button>
-      </form>
-      <article className="opsPanel">
-        <h2>Withdrawals</h2>
-        <div className="opsList">
-          {withdrawals.slice(0, 6).map((item) => (
-            <span key={item._id}>{item.seller?.name || "Seller"} · {money(item.amount)} · {item.status}</span>
-          ))}
-          {withdrawals.length === 0 && <span>No withdrawal requests.</span>}
-        </div>
-      </article>
-    </div>
+      )}
+      {tab === "users" && <AdminList title="All users" rows={users.map((u) => `${u.name} · ${u.email || u.phone} · ${u.role} · ${u.isActive ? "active" : "disabled"}`)} />}
+      {tab === "sellers" && (
+        <article className="opsPanel wide">
+          <h2>Seller control</h2>
+          <div className="opsList">
+            {sellers.map((seller) => (
+              <button key={seller._id} onClick={() => toggleSeller(seller)}>
+                {seller.name} · {seller.sellerProfile?.isOnline === false ? "offline" : "online"} · {seller.isActive ? "Disable" : "Enable"}
+              </button>
+            ))}
+            {sellers.length === 0 && <span>No sellers yet.</span>}
+          </div>
+        </article>
+      )}
+      {tab === "delivery" && <AdminList title="Delivery partners" rows={partners.map((p) => `${p.name} · ${p.email || p.phone} · ${p.isActive ? "active" : "disabled"}`)} />}
+      {tab === "products" && <AdminList title="Product audit" rows={products.map((p) => `${p.name} · ${money(p.price)} · ${p.seller?.name || "Seller"} · ${p.status}`)} />}
+      {tab === "orders" && <AdminList title="Order operations" rows={orders.map((o) => `${o._id.slice(-8)} · ${money(o.total)} · ${o.payment?.status} · ${o.delivery?.status}`)} />}
+      {tab === "tickets" && <AdminList title="Support tickets" rows={tickets.map((t) => `${t.subject} · ${t.user?.name || "User"} · ${t.status}`)} />}
+      {tab === "offers" && (
+        <form className="opsPanel wide" onSubmit={createOffer}>
+          <h2>Create offer</h2>
+          <input value={offer.title} onChange={(e) => setOffer((current) => ({ ...current, title: e.target.value }))} placeholder="Offer title" required />
+          <input value={offer.code} onChange={(e) => setOffer((current) => ({ ...current, code: e.target.value }))} placeholder="Code" required />
+          <input type="number" value={offer.discountValue} onChange={(e) => setOffer((current) => ({ ...current, discountValue: Number(e.target.value) }))} />
+          <button className="primaryButton">Create offer</button>
+        </form>
+      )}
+      {tab === "withdrawals" && <AdminList title="Withdrawal requests" rows={withdrawals.map((w) => `${w.seller?.name || "Seller"} · ${money(w.amount)} · ${w.status}`)} />}
+    </>
+  );
+}
+
+function AdminList({ title, rows }) {
+  return (
+    <article className="opsPanel wide">
+      <h2>{title}</h2>
+      <div className="opsList">
+        {rows.map((row, index) => <span key={`${row}-${index}`}>{row}</span>)}
+        {rows.length === 0 && <span>No records yet.</span>}
+      </div>
+    </article>
   );
 }
 
@@ -303,6 +335,7 @@ function SellerConsole({ token, setMessage }) {
 }
 
 function DeliveryConsole({ token, setMessage }) {
+  const [tab, setTab] = useState("dashboard");
   const [orders, setOrders] = useState([]);
   const [location, setLocation] = useState({ orderId: "", lat: "19.0596", lng: "72.8295", etaMinutes: 12 });
   const assignedOrder = useMemo(() => orders.find((order) => order._id === location.orderId), [location.orderId, orders]);
@@ -332,33 +365,53 @@ function DeliveryConsole({ token, setMessage }) {
   };
 
   return (
-    <div className="opsGrid">
-      <article className="opsPanel">
-        <h2>Assigned orders</h2>
-        <div className="opsList">
-          {orders.map((order) => (
-            <button key={order._id} onClick={() => setLocation((current) => ({ ...current, orderId: order._id }))}>
-              {order._id.slice(-6)} · {order.delivery?.status}
-            </button>
-          ))}
-          {orders.length === 0 && <span>No assigned orders yet.</span>}
+    <>
+      <div className="sellerTabs">
+        {["dashboard", "assigned", "active", "location", "history", "notifications"].map((item) => (
+          <button className={tab === item ? "active" : ""} key={item} onClick={() => setTab(item)}>{item}</button>
+        ))}
+      </div>
+      {tab === "dashboard" && (
+        <div className="opsGrid">
+          <article className="opsPanel"><h2>Assigned orders</h2><p>{orders.length}</p><button onClick={() => setTab("assigned")}>Open assignments</button></article>
+          <article className="opsPanel"><h2>Active delivery</h2><p>{orders.filter((order) => order.delivery?.status === "out_for_delivery").length}</p><button onClick={() => setTab("active")}>View active</button></article>
+          <article className="opsPanel"><h2>Location</h2><p>Update lat, lng and ETA for selected order.</p><button onClick={() => setTab("location")}>Update location</button></article>
         </div>
-      </article>
-      <form className="opsPanel" onSubmit={updateLocation}>
-        <h2>Update live location</h2>
-        <select value={location.orderId} onChange={(e) => setLocation((current) => ({ ...current, orderId: e.target.value }))}>
-          <option value="">Select assigned order</option>
-          {orders.map((order) => <option key={order._id} value={order._id}>{order._id.slice(-8)}</option>)}
-        </select>
-        <input value={location.lat} onChange={(e) => setLocation((current) => ({ ...current, lat: e.target.value }))} placeholder="Latitude" />
-        <input value={location.lng} onChange={(e) => setLocation((current) => ({ ...current, lng: e.target.value }))} placeholder="Longitude" />
-        <input type="number" value={location.etaMinutes} onChange={(e) => setLocation((current) => ({ ...current, etaMinutes: Number(e.target.value) }))} />
-        <button className="primaryButton">Send location</button>
-      </form>
-      <article className="opsPanel">
-        <h2>Current assignment</h2>
-        <p>{assignedOrder ? `${assignedOrder.items?.length || 0} items · ${assignedOrder.delivery?.status}` : "Select an order to view details."}</p>
-      </article>
-    </div>
+      )}
+      {tab === "assigned" && <DeliveryOrderList orders={orders} setLocation={setLocation} />}
+      {tab === "active" && <DeliveryOrderList orders={orders.filter((order) => order.delivery?.status === "out_for_delivery")} setLocation={setLocation} />}
+      {tab === "location" && (
+        <form className="opsPanel wide" onSubmit={updateLocation}>
+          <h2>Update live location</h2>
+          <select value={location.orderId} onChange={(e) => setLocation((current) => ({ ...current, orderId: e.target.value }))}>
+            <option value="">Select assigned order</option>
+            {orders.map((order) => <option key={order._id} value={order._id}>{order._id.slice(-8)}</option>)}
+          </select>
+          <input value={location.lat} onChange={(e) => setLocation((current) => ({ ...current, lat: e.target.value }))} placeholder="Latitude" />
+          <input value={location.lng} onChange={(e) => setLocation((current) => ({ ...current, lng: e.target.value }))} placeholder="Longitude" />
+          <input type="number" value={location.etaMinutes} onChange={(e) => setLocation((current) => ({ ...current, etaMinutes: Number(e.target.value) }))} />
+          <button className="primaryButton">Send location</button>
+        </form>
+      )}
+      {tab === "history" && <DeliveryOrderList orders={orders.filter((order) => ["delivered", "cancelled"].includes(order.delivery?.status))} setLocation={setLocation} />}
+      {tab === "notifications" && <article className="opsPanel wide"><h2>Notifications</h2><p>Pickup, drop, and location update notifications arrive in real-time via Socket.IO.</p></article>}
+      {assignedOrder && <article className="opsPanel wide"><h2>Selected assignment</h2><p>{assignedOrder._id.slice(-8)} · {assignedOrder.items?.length || 0} items · {assignedOrder.delivery?.status}</p></article>}
+    </>
+  );
+}
+
+function DeliveryOrderList({ orders, setLocation }) {
+  return (
+    <article className="opsPanel wide">
+      <h2>Orders</h2>
+      <div className="opsList">
+        {orders.map((order) => (
+          <button key={order._id} onClick={() => setLocation((current) => ({ ...current, orderId: order._id }))}>
+            {order._id.slice(-8)} · {money(order.total)} · {order.delivery?.status}
+          </button>
+        ))}
+        {orders.length === 0 && <span>No orders in this view.</span>}
+      </div>
+    </article>
   );
 }
