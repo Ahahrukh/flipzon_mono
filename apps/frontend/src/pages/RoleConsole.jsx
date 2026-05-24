@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import Footer from "../components/Footer.jsx";
 import Header from "../components/Header.jsx";
+import LiveMap from "../components/LiveMap.jsx";
 import { apiRequest } from "../services/api.js";
 
 const money = (value = 0) => `Rs ${Math.round(value)}`;
 
 export default function RoleConsole() {
   const { token, user } = useSelector((state) => state.auth);
+  const [searchParams] = useSearchParams();
   const role = user?.role || "user";
   const [message, setMessage] = useState("");
 
@@ -35,30 +37,109 @@ export default function RoleConsole() {
         {role === "admin" && <AdminConsole token={token} setMessage={setMessage} />}
         {role === "seller" && <SellerConsole token={token} setMessage={setMessage} />}
         {role === "delivery_partner" && <DeliveryConsole token={token} setMessage={setMessage} />}
-        {role === "user" && <UserConsole user={user} />}
+        {role === "user" && <UserConsole user={user} token={token} initialTab={searchParams.get("tab")} initialOrderId={searchParams.get("order")} setMessage={setMessage} />}
       </section>
       <Footer />
     </main>
   );
 }
 
-function UserConsole({ user }) {
+function UserConsole({ user, token, initialTab, initialOrderId, setMessage }) {
+  const [tab, setTab] = useState(initialTab === "orders" ? "orders" : "dashboard");
+  const [orders, setOrders] = useState([]);
+  const [selectedOrderId, setSelectedOrderId] = useState(initialOrderId || "");
+  const selectedOrder = useMemo(() => orders.find((order) => order._id === selectedOrderId) || orders[0], [orders, selectedOrderId]);
+
+  const loadOrders = async () => {
+    if (!token) return;
+    const data = await apiRequest("/orders/mine", { token });
+    setOrders(data.orders || []);
+    if (!selectedOrderId && data.orders?.[0]) setSelectedOrderId(data.orders[0]._id);
+  };
+
+  useEffect(() => {
+    if (token) loadOrders().catch((error) => setMessage(error.message));
+  }, [token]);
+
+  useEffect(() => {
+    if (initialTab === "orders") setTab("orders");
+    if (initialOrderId) setSelectedOrderId(initialOrderId);
+  }, [initialOrderId, initialTab]);
+
   return (
-    <div className="consoleGrid">
-      <article className="consoleCard wide">
-        <h2>Orders and checkout</h2>
-        <p>Shop products, review cart, pay online, and track delivery after order assignment.</p>
-        <Link className="primaryButton" to="/">Start shopping</Link>
-      </article>
-      <article className="consoleCard">
-        <h2>Referral</h2>
-        <p>Your code: {user?.referralCode || "Login to generate code"}</p>
-      </article>
-      <article className="consoleCard">
-        <h2>Tickets</h2>
-        <p>Support ticket creation is available from the order flow.</p>
-      </article>
-    </div>
+    <>
+      <div className="sellerTabs">
+        {["dashboard", "orders", "tracking", "referral", "tickets"].map((item) => (
+          <button className={tab === item ? "active" : ""} key={item} onClick={() => setTab(item)}>{item}</button>
+        ))}
+      </div>
+
+      {tab === "dashboard" && (
+        <div className="consoleGrid">
+          <article className="consoleCard wide">
+            <h2>Orders and checkout</h2>
+            <p>Shop products, review cart, pay online, and track delivery after order assignment.</p>
+            <Link className="primaryButton" to="/">Start shopping</Link>
+          </article>
+          <article className="consoleCard">
+            <h2>My orders</h2>
+            <p>{orders.length} orders placed</p>
+            <button onClick={() => setTab("orders")}>View orders</button>
+          </article>
+          <article className="consoleCard">
+            <h2>Referral</h2>
+            <p>Your code: {user?.referralCode || "Login to generate code"}</p>
+          </article>
+        </div>
+      )}
+
+      {tab === "orders" && (
+        <article className="opsPanel wide">
+          <h2>My orders</h2>
+          <div className="orderList">
+            {orders.map((order) => (
+              <button
+                className={selectedOrder?._id === order._id ? "active" : ""}
+                key={order._id}
+                onClick={() => {
+                  setSelectedOrderId(order._id);
+                  setTab("tracking");
+                }}
+              >
+                <span>#{order._id.slice(-8)}</span>
+                <strong>{money(order.total)}</strong>
+                <small>{order.items.map((item) => `${item.name} x${item.quantity}`).join(", ")}</small>
+                <em>{order.delivery?.status || "placed"}</em>
+              </button>
+            ))}
+            {orders.length === 0 && <p>No orders yet. Place an order from the cart and it will appear here.</p>}
+          </div>
+        </article>
+      )}
+
+      {tab === "tracking" && (
+        <div className="trackingGrid">
+          <article className="opsPanel">
+            <h2>Track your order</h2>
+            {selectedOrder ? (
+              <div className="trackingDetails">
+                <strong>#{selectedOrder._id.slice(-8)}</strong>
+                <span>{selectedOrder.items.map((item) => `${item.name} x${item.quantity}`).join(", ")}</span>
+                <span>Payment: {selectedOrder.payment?.status || "pending"}</span>
+                <span>Delivery: {selectedOrder.delivery?.status || "placed"}</span>
+                <span>ETA: {selectedOrder.delivery?.etaMinutes || 12} min</span>
+              </div>
+            ) : (
+              <p>No order selected.</p>
+            )}
+          </article>
+          <LiveMap order={selectedOrder} />
+        </div>
+      )}
+
+      {tab === "referral" && <article className="opsPanel wide"><h2>Referral</h2><p>Your code: {user?.referralCode || "Login to generate code"}</p></article>}
+      {tab === "tickets" && <article className="opsPanel wide"><h2>Tickets</h2><p>Support ticket creation is available from the order flow.</p></article>}
+    </>
   );
 }
 
@@ -71,17 +152,20 @@ function AdminConsole({ token, setMessage }) {
   const [orders, setOrders] = useState([]);
   const [tickets, setTickets] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
+  const [applications, setApplications] = useState([]);
+  const [applicationStatus, setApplicationStatus] = useState("");
   const [offer, setOffer] = useState({ title: "", code: "", discountValue: 10 });
 
   const load = async () => {
-    const [userData, productData, sellerData, partnerData, orderData, ticketData, withdrawalData] = await Promise.all([
+    const [userData, productData, sellerData, partnerData, orderData, ticketData, withdrawalData, applicationData] = await Promise.all([
       apiRequest("/admin/users", { token }),
       apiRequest("/admin/products", { token }),
       apiRequest("/admin/sellers", { token }),
       apiRequest("/admin/delivery-partners", { token }),
       apiRequest("/admin/orders", { token }),
       apiRequest("/admin/tickets", { token }),
-      apiRequest("/admin/withdrawals", { token })
+      apiRequest("/admin/withdrawals", { token }),
+      apiRequest(`/admin/partner-applications${applicationStatus ? `?status=${applicationStatus}` : ""}`, { token })
     ]);
     setUsers(userData.users || []);
     setProducts(productData.products || []);
@@ -90,11 +174,12 @@ function AdminConsole({ token, setMessage }) {
     setOrders(orderData.orders || []);
     setTickets(ticketData.tickets || []);
     setWithdrawals(withdrawalData.withdrawals || []);
+    setApplications(applicationData.applications || []);
   };
 
   useEffect(() => {
     if (token) load().catch((error) => setMessage(error.message));
-  }, [token]);
+  }, [token, applicationStatus]);
 
   const createOffer = async (event) => {
     event.preventDefault();
@@ -117,10 +202,20 @@ function AdminConsole({ token, setMessage }) {
     await load();
   };
 
+  const updateApplication = async (application, status) => {
+    await apiRequest(`/admin/partner-applications/${application._id}`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify({ ...application, status })
+    });
+    setMessage(`Application ${status}.`);
+    await load();
+  };
+
   return (
     <>
       <div className="sellerTabs">
-        {["dashboard", "users", "sellers", "delivery", "products", "orders", "tickets", "offers", "withdrawals"].map((item) => (
+        {["dashboard", "applications", "users", "sellers", "delivery", "products", "orders", "tickets", "offers", "withdrawals"].map((item) => (
           <button className={tab === item ? "active" : ""} key={item} onClick={() => setTab(item)}>{item}</button>
         ))}
       </div>
@@ -132,7 +227,34 @@ function AdminConsole({ token, setMessage }) {
           <article className="opsPanel"><h2>Orders</h2><p>{orders.length}</p></article>
           <article className="opsPanel"><h2>Tickets</h2><p>{tickets.length}</p></article>
           <article className="opsPanel"><h2>Withdrawals</h2><p>{withdrawals.length}</p></article>
+          <article className="opsPanel"><h2>Access requests</h2><p>{applications.filter((item) => item.status === "pending").length} pending</p><button onClick={() => setTab("applications")}>Review requests</button></article>
         </div>
+      )}
+      {tab === "applications" && (
+        <article className="opsPanel wide">
+          <h2>Seller and delivery requests</h2>
+          <select value={applicationStatus} onChange={(event) => setApplicationStatus(event.target.value)}>
+            <option value="">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <div className="sellerTable applicationTable">
+            {applications.map((application) => (
+              <div key={application._id}>
+                <span>{application.name}</span>
+                <span>{application.email || application.phone}</span>
+                <span>{application.requestedRole.replace("_", " ")}</span>
+                <span>{application.city || application.storeName || application.vehicleType || "No details"}</span>
+                <span>{application.status}</span>
+                <button onClick={() => updateApplication(application, "approved")}>Approve</button>
+                <button onClick={() => updateApplication(application, "pending")}>Pending</button>
+                <button onClick={() => updateApplication(application, "rejected")}>Reject</button>
+              </div>
+            ))}
+            {applications.length === 0 && <p>No access requests yet.</p>}
+          </div>
+        </article>
       )}
       {tab === "users" && <AdminList title="All users" rows={users.map((u) => `${u.name} · ${u.email || u.phone} · ${u.role} · ${u.isActive ? "active" : "disabled"}`)} />}
       {tab === "sellers" && (

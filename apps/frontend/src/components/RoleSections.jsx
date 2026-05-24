@@ -1,5 +1,7 @@
 import { PackagePlus, ShoppingBag, Truck } from "lucide-react";
 import { useState } from "react";
+import { useSelector } from "react-redux";
+import { apiRequest } from "../services/api.js";
 
 const roleSections = [
   {
@@ -23,11 +25,36 @@ const roleSections = [
 ];
 
 export default function RoleSections({ authenticated }) {
-  const [request, setRequest] = useState({ type: "seller", name: "", phone: "", note: "" });
-  const submitRequest = (event) => {
+  const { token, user } = useSelector((state) => state.auth);
+  const [request, setRequest] = useState({
+    requestedRole: "seller",
+    name: user?.name || "",
+    email: user?.email || "",
+    phone: user?.phone || "",
+    city: "",
+    storeName: "",
+    vehicleType: "",
+    note: ""
+  });
+  const [message, setMessage] = useState("");
+  const submitRequest = async (event) => {
     event.preventDefault();
-    window.alert(`Your ${request.type.replace("_", " ")} request is captured. Admin can verify it and update the role manually in database.`);
-    setRequest({ type: request.type, name: "", phone: "", note: "" });
+    await apiRequest("/partner-applications", {
+      method: "POST",
+      token,
+      body: JSON.stringify(request)
+    });
+    setMessage("Request sent to admin for review.");
+    setRequest((current) => ({
+      requestedRole: current.requestedRole,
+      name: user?.name || "",
+      email: user?.email || "",
+      phone: user?.phone || "",
+      city: "",
+      storeName: "",
+      vehicleType: "",
+      note: ""
+    }));
   };
 
   return (
@@ -54,7 +81,7 @@ export default function RoleSections({ authenticated }) {
         </div>
         <label>
           Request type
-          <select value={request.type} onChange={(event) => setRequest((current) => ({ ...current, type: event.target.value }))}>
+          <select value={request.requestedRole} onChange={(event) => setRequest((current) => ({ ...current, requestedRole: event.target.value }))}>
             <option value="seller">Become a seller</option>
             <option value="delivery_partner">Become a delivery partner</option>
           </select>
@@ -64,14 +91,35 @@ export default function RoleSections({ authenticated }) {
           <input value={request.name} onChange={(event) => setRequest((current) => ({ ...current, name: event.target.value }))} placeholder="Your name" required />
         </label>
         <label>
+          Email
+          <input type="email" value={request.email} onChange={(event) => setRequest((current) => ({ ...current, email: event.target.value }))} placeholder="you@example.com" required />
+        </label>
+        <label>
           Phone
           <input value={request.phone} onChange={(event) => setRequest((current) => ({ ...current, phone: event.target.value }))} placeholder="9876543210" required />
         </label>
         <label>
+          City
+          <input value={request.city} onChange={(event) => setRequest((current) => ({ ...current, city: event.target.value }))} placeholder="Mumbai" required />
+        </label>
+        {request.requestedRole === "seller" && (
+          <label>
+            Store name
+            <input value={request.storeName} onChange={(event) => setRequest((current) => ({ ...current, storeName: event.target.value }))} placeholder="Fresh Basket" required />
+          </label>
+        )}
+        {request.requestedRole === "delivery_partner" && (
+          <label>
+            Vehicle type
+            <input value={request.vehicleType} onChange={(event) => setRequest((current) => ({ ...current, vehicleType: event.target.value }))} placeholder="Bike, scooter, cycle" required />
+          </label>
+        )}
+        <label>
           Details
-          <input value={request.note} onChange={(event) => setRequest((current) => ({ ...current, note: event.target.value }))} placeholder="Store name, vehicle type, city..." />
+          <input value={request.note} onChange={(event) => setRequest((current) => ({ ...current, note: event.target.value }))} placeholder="Extra information for admin" />
         </label>
         <button className="primaryButton" type="submit">Submit request</button>
+        {message && <p className="formSuccess">{message}</p>}
       </form>
     </section>
   );

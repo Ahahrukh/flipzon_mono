@@ -3,8 +3,30 @@ import Product from "../models/Product.js";
 import User from "../models/User.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
+const productDisplayKey = (product) =>
+  [product.name, product.category, product.brand || ""]
+    .join("|")
+    .trim()
+    .toLowerCase();
+
+const dedupeProducts = (products) => {
+  const byDisplayKey = new Map();
+
+  products.forEach((product) => {
+    const key = productDisplayKey(product);
+    const current = byDisplayKey.get(key);
+    if (!current || product.price < current.price || (product.price === current.price && product.stock > current.stock)) {
+      byDisplayKey.set(key, product);
+    }
+  });
+
+  return Array.from(byDisplayKey.values());
+};
+
 export const listProducts = asyncHandler(async (req, res) => {
   const { q, category, seller, status = "active", minPrice, maxPrice } = req.query;
+  const page = Math.max(1, Number(req.query.page || 1));
+  const limit = Math.min(1000, Math.max(1, Number(req.query.limit || 100)));
   const filter = {};
   if (q) filter.$text = { $search: q };
   if (category) filter.category = category;
@@ -21,7 +43,34 @@ export const listProducts = asyncHandler(async (req, res) => {
   }
 
   const products = await Product.find(filter).populate("seller", "name sellerProfile.storeName").sort("-createdAt");
-  res.json({ products });
+  const uniqueProducts = dedupeProducts(products);
+  const total = uniqueProducts.length;
+  const pageCount = Math.max(1, Math.ceil(total / limit));
+  const productsForPage = uniqueProducts.slice((page - 1) * limit, page * limit);
+
+  res.json({
+    products: productsForPage,
+    pagination: {
+      page,
+      limit,
+      total,
+      pageCount,
+      hasNextPage: page < pageCount,
+      hasPreviousPage: page > 1
+    }
+  });
+});
+
+export const getProduct = asyncHandler(async (req, res) => {
+  const product = await Product.findOne({ _id: req.params.id, status: "active" }).populate(
+    "seller",
+    "name isActive sellerProfile.storeName sellerProfile.isOnline"
+  );
+  if (!product || !product.seller?.isActive || product.seller?.sellerProfile?.isOnline === false) {
+    res.status(404);
+    throw new Error("Product not found or seller is offline");
+  }
+  res.json({ product });
 });
 
 export const createProduct = asyncHandler(async (req, res) => {

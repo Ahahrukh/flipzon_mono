@@ -11,7 +11,7 @@ export default function ProductCard({ product }) {
   return (
     <motion.article className="productCard" whileHover={{ y: -4 }} layout>
       <Link to={`/products/${product.id}`} className="productArt" style={{ background: product.color }}>
-        <span>{product.emoji}</span>
+        {product.imageUrl ? <img src={product.imageUrl} alt={product.name} /> : <span>{product.emoji}</span>}
       </Link>
       <div className="productMeta">
         <p>{product.time}</p>

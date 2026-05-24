@@ -1,35 +1,55 @@
-import { CheckCircle2, MapPinned, Minus, Plus, Trash2 } from "lucide-react";
+import { Minus, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import Footer from "../components/Footer.jsx";
 import Header from "../components/Header.jsx";
 import { clearCart, decrementQuantity, incrementQuantity, removeFromCart } from "../features/cart/cartSlice.js";
+import { apiRequest } from "../services/api.js";
 
 export default function Cart() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const [orderPlaced, setOrderPlaced] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
   const items = useSelector((state) => state.cart.items);
   const user = useSelector((state) => state.auth.user);
+  const token = useSelector((state) => state.auth.token);
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const referralDiscount = subtotal > 0 ? Math.round(subtotal * 0.2) : 0;
   const deliveryFee = subtotal > 499 || subtotal === 0 ? 0 : 25;
   const total = subtotal - referralDiscount + deliveryFee;
-  const handlePay = useCallback(() => {
+  const handlePay = useCallback(async () => {
     if (!user) {
       sessionStorage.setItem("flipzon_pending_checkout", "1");
       navigate("/login?redirect=/cart&checkout=1");
       return;
     }
+    if (!items.length) return;
     setIsPaying(true);
-    setOrderPlaced(false);
-    window.setTimeout(() => {
+    setCheckoutError("");
+    try {
+      const data = await apiRequest("/orders", {
+        method: "POST",
+        token,
+        body: JSON.stringify({
+          items: items.map((item) => ({ product: item.id, quantity: item.quantity })),
+          address: {
+            label: "Home",
+            line1: "Bandra West",
+            city: "Mumbai",
+            coordinates: { lat: 19.0596, lng: 72.8295 }
+          }
+        })
+      });
+      dispatch(clearCart());
+      navigate(`/console?tab=orders&order=${data.order._id}`);
+    } catch (error) {
+      setCheckoutError(error.message);
+    } finally {
       setIsPaying(false);
-      setOrderPlaced(true);
-    }, 900);
-  }, [navigate, user]);
+    }
+  }, [dispatch, items, navigate, token, user]);
 
   useEffect(() => {
     const shouldResume = sessionStorage.getItem("flipzon_pending_checkout") === "1";
@@ -99,20 +119,15 @@ export default function Cart() {
               <div className="totalLine"><span>Total</span><strong>Rs {total}</strong></div>
               <button className="primaryButton payButton" onClick={handlePay} disabled={isPaying}>
                 {isPaying && <span className="buttonSpinner" />}
-                {isPaying ? "Preparing payment..." : "Proceed to pay"}
+                {isPaying ? "Creating order..." : "Proceed to pay"}
               </button>
-              {orderPlaced && (
-                <div className="orderStatusPanel">
-                  <div>
-                    <h3><CheckCircle2 size={20} /> Payment request ready</h3>
-                    <p>Next step connects this cart to Razorpay order creation.</p>
-                  </div>
-                  <div>
-                    <h3><MapPinned size={20} /> Delivery tracking after order</h3>
-                    <p>Live rider tracking appears once the order is placed and assigned.</p>
-                  </div>
+              {checkoutError && <p className="formError">{checkoutError}</p>}
+              <div className="orderStatusPanel">
+                <div>
+                  <h3>After checkout</h3>
+                  <p>Your cart clears and this order moves to My orders with live tracking.</p>
                 </div>
-              )}
+              </div>
             </aside>
           </div>
         )}

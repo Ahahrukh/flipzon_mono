@@ -7,8 +7,14 @@ const razorpay = new Razorpay({
   key_secret: env.razorpayKeySecret || "placeholder"
 });
 
+const isDevRazorpayConfig =
+  !env.razorpayKeyId ||
+  !env.razorpayKeySecret ||
+  env.razorpayKeyId.includes("xxxxx") ||
+  env.razorpayKeySecret === "replace_me";
+
 export const createPaymentOrder = async ({ amount, receipt }) => {
-  if (!env.razorpayKeyId || !env.razorpayKeySecret) {
+  if (isDevRazorpayConfig) {
     return {
       id: `dev_order_${Date.now()}`,
       amount: Math.round(amount * 100),
@@ -26,7 +32,7 @@ export const createPaymentOrder = async ({ amount, receipt }) => {
 };
 
 export const verifyPaymentSignature = ({ razorpayOrderId, razorpayPaymentId, razorpaySignature }) => {
-  if (!env.razorpayKeySecret) return true;
+  if (isDevRazorpayConfig) return true;
   const payload = `${razorpayOrderId}|${razorpayPaymentId}`;
   const expected = crypto.createHmac("sha256", env.razorpayKeySecret).update(payload).digest("hex");
   return expected === razorpaySignature;

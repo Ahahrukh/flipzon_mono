@@ -23,6 +23,20 @@ export const protect = asyncHandler(async (req, _res, next) => {
   next();
 });
 
+export const optionalAuth = asyncHandler(async (req, _res, next) => {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) {
+    return next();
+  }
+
+  const decoded = jwt.verify(header.split(" ")[1], env.jwtSecret);
+  const user = await User.findById(decoded.id).select("-passwordHash -otp");
+  if (user?.isActive) {
+    req.user = user;
+  }
+  return next();
+});
+
 export const authorize = (...roles) => (req, _res, next) => {
   if (!roles.includes(req.user.role)) {
     const error = new Error("You do not have permission for this action");

@@ -1,4 +1,5 @@
 import { ArrowLeft, Minus, Plus, ShoppingBag, Star } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import Footer from "../components/Footer.jsx";
@@ -6,12 +7,49 @@ import Header from "../components/Header.jsx";
 import ProductCard from "../components/ProductCard.jsx";
 import { products } from "../data/products.js";
 import { addToCart, decrementQuantity, incrementQuantity } from "../features/cart/cartSlice.js";
+import { apiRequest } from "../services/api.js";
+import { normalizeProduct } from "../utils/normalizeProduct.js";
 
 export default function ProductDetails() {
   const { id } = useParams();
   const dispatch = useDispatch();
-  const product = products.find((item) => item.id === id);
+  const fallbackProduct = useMemo(() => products.find((item) => item.id === id), [id]);
+  const [product, setProduct] = useState(fallbackProduct);
+  const [status, setStatus] = useState(fallbackProduct ? "success" : "loading");
+  const [message, setMessage] = useState("");
   const cartItem = useSelector((state) => state.cart.items.find((item) => item.id === id));
+
+  useEffect(() => {
+    if (fallbackProduct) {
+      setProduct(fallbackProduct);
+      setStatus("success");
+      return;
+    }
+
+    setStatus("loading");
+    apiRequest(`/products/${id}`)
+      .then((data) => {
+        setProduct(normalizeProduct(data.product));
+        setStatus("success");
+      })
+      .catch((error) => {
+        setProduct(null);
+        setStatus("error");
+        setMessage(error.message);
+      });
+  }, [fallbackProduct, id]);
+
+  if (status === "loading") {
+    return (
+      <main>
+        <Header />
+        <section className="detailPage">
+          <div className="emptyState">Loading product details...</div>
+        </section>
+        <Footer />
+      </main>
+    );
+  }
 
   if (!product) {
     return (
@@ -19,6 +57,7 @@ export default function ProductDetails() {
         <Header />
         <section className="detailPage">
           <h1>Product not found</h1>
+          {message && <p className="emptyState">{message}</p>}
           <Link className="secondaryButton" to="/">Back to shop</Link>
         </section>
         <Footer />
@@ -37,7 +76,7 @@ export default function ProductDetails() {
         </Link>
         <div className="detailGrid">
           <div className="detailArt" style={{ background: product.color }}>
-            <span>{product.emoji}</span>
+            {product.imageUrl ? <img src={product.imageUrl} alt={product.name} /> : <span>{product.emoji}</span>}
           </div>
           <div className="detailInfo">
             <p className="eyebrow">{product.category}</p>

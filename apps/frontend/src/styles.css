@@ -107,6 +107,17 @@ main {
   background: #ffffff;
 }
 
+.searchSubmit {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #14251c;
+}
+
 .searchBox input,
 .authForm input {
   width: 100%;
@@ -116,7 +127,63 @@ main {
 }
 
 .navActions {
+  position: relative;
   gap: 10px;
+}
+
+.notificationWrap {
+  position: relative;
+}
+
+.notificationPanel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 30;
+  width: min(360px, 88vw);
+  border: 1px solid #dce3d4;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 50px rgba(20, 37, 28, 0.16);
+}
+
+.notificationHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid #edf2e7;
+}
+
+.notificationHead button {
+  border: 0;
+  background: transparent;
+  color: #22834d;
+  font-weight: 900;
+}
+
+.notificationList {
+  display: grid;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.notificationList button,
+.notificationList .emptyNotice {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 0;
+  border-bottom: 1px solid #edf2e7;
+  background: #ffffff;
+  color: #173d2e;
+  text-align: left;
+}
+
+.notificationList span {
+  color: #617268;
+  font-size: 13px;
 }
 
 .iconButton,
@@ -362,6 +429,34 @@ main {
   font-weight: 700;
 }
 
+.productSource {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border: 1px solid #dce3d4;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #40584c;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.productSource-loading {
+  background: #f7fbe9;
+}
+
+.productSource-success {
+  background: #eff9e5;
+}
+
+.productSource-error {
+  border-color: #f1d4c9;
+  background: #fff3ed;
+  color: #8a351e;
+}
+
 .filterPanel {
   display: grid;
   grid-template-columns: 160px minmax(220px, 1.1fr) minmax(190px, 1fr) minmax(190px, 1fr) minmax(220px, 1fr) 120px;
@@ -427,6 +522,55 @@ main {
   gap: 16px;
 }
 
+.paginationBar {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  margin-top: 20px;
+  padding: 12px 14px;
+  border: 1px solid #dce3d4;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.paginationBar span {
+  color: #586a5f;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.paginationControls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.paginationControls button {
+  display: grid;
+  place-items: center;
+  min-width: 38px;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid #d2dcc9;
+  border-radius: 8px;
+  background: #f9fbf5;
+  color: #173d2e;
+  font-weight: 900;
+}
+
+.paginationControls button.active {
+  border-color: #9fe939;
+  background: #a7f23b;
+}
+
+.paginationControls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .productCard,
 .consoleCard,
 .authForm {
@@ -443,10 +587,18 @@ main {
   display: grid;
   place-items: center;
   height: 160px;
+  overflow: hidden;
   border-radius: 8px;
   color: rgba(20, 33, 27, 0.78);
   font-size: 64px;
   font-weight: 950;
+}
+
+.productArt img,
+.detailArt img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .productMeta p {
@@ -941,6 +1093,12 @@ main {
   margin: 0;
 }
 
+.mapHeader span {
+  color: #617268;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
 .mapCanvas {
   position: relative;
   min-height: 300px;
@@ -989,6 +1147,19 @@ main {
   height: 54px;
   background: #173d2e;
   color: white;
+}
+
+.riderPin {
+  left: 26%;
+  top: 24%;
+  width: auto;
+  min-width: 88px;
+  height: 34px;
+  padding: 0 10px;
+  background: #ffffff;
+  color: #173d2e;
+  font-size: 12px;
+  box-shadow: 0 8px 22px rgba(20, 37, 28, 0.14);
 }
 
 .rider {
@@ -1135,6 +1306,57 @@ main {
   color: #14211b;
 }
 
+.orderList {
+  display: grid;
+  gap: 10px;
+}
+
+.orderList button {
+  display: grid;
+  grid-template-columns: 110px 90px minmax(0, 1fr) 130px;
+  gap: 10px;
+  align-items: center;
+  min-height: 62px;
+  padding: 12px;
+  border: 1px solid #dce3d4;
+  border-radius: 8px;
+  background: #f9fbf5;
+  color: #173d2e;
+  text-align: left;
+}
+
+.orderList button.active {
+  border-color: #a7f23b;
+  background: #f1ffe1;
+}
+
+.orderList small,
+.orderList em {
+  color: #617268;
+  font-style: normal;
+}
+
+.trackingGrid {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 16px;
+}
+
+.trackingGrid .mapPanel {
+  padding: 0;
+}
+
+.trackingDetails {
+  display: grid;
+  gap: 10px;
+  color: #53675c;
+}
+
+.trackingDetails strong {
+  color: #14251c;
+  font-size: 24px;
+}
+
 .opsList {
   display: grid;
   gap: 8px;
@@ -1192,6 +1414,10 @@ main {
   border: 1px solid #dce3d4;
   border-radius: 8px;
   background: #f9fbf5;
+}
+
+.applicationTable > div {
+  grid-template-columns: minmax(120px, 1fr) minmax(170px, 1.2fr) minmax(120px, 0.8fr) minmax(120px, 1fr) 90px auto auto auto;
 }
 
 .sellerTable button,
@@ -1286,7 +1512,8 @@ main {
   .hero,
   .contentGrid,
   .detailGrid,
-  .cartGrid {
+  .cartGrid,
+  .trackingGrid {
     grid-template-columns: 1fr;
   }
 
@@ -1401,6 +1628,10 @@ main {
   }
 
   .sellerTable > div {
+    grid-template-columns: 1fr;
+  }
+
+  .orderList button {
     grid-template-columns: 1fr;
   }
 

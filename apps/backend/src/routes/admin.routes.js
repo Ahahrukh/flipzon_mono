@@ -7,8 +7,10 @@ import {
   createOffer,
   deliveryPartners,
   listWithdrawals,
+  listPartnerApplications,
   sellers,
   users,
+  updatePartnerApplication,
   updateSellerStatus,
   updateWithdrawal
 } from "../controllers/admin.controller.js";
@@ -24,8 +26,10 @@ router.get("/delivery-partners", deliveryPartners);
 router.get("/orders", adminOrders);
 router.get("/tickets", adminTickets);
 router.get("/withdrawals", listWithdrawals);
+router.get("/partner-applications", listPartnerApplications);
 router.patch("/orders/:id/assign-delivery", assignDeliveryPartner);
 router.patch("/sellers/:id/status", updateSellerStatus);
+router.patch("/partner-applications/:id", updatePartnerApplication);
 router.post("/offers", createOffer);
 router.patch("/withdrawals/:id", updateWithdrawal);
 

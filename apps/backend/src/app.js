@@ -15,6 +15,7 @@ import adminRoutes from "./routes/admin.routes.js";
 import ticketRoutes from "./routes/ticket.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import deliveryRoutes from "./routes/delivery.routes.js";
+import partnerApplicationRoutes from "./routes/partnerApplication.routes.js";
 import { env } from "./config/env.js";
 import { isDbConnected } from "./config/db.js";
 import { requireDb } from "./middleware/db.middleware.js";
@@ -47,6 +48,7 @@ app.use("/api/admin", requireDb, adminRoutes);
 app.use("/api/tickets", requireDb, ticketRoutes);
 app.use("/api/notifications", requireDb, notificationRoutes);
 app.use("/api/delivery", requireDb, deliveryRoutes);
+app.use("/api/partner-applications", requireDb, partnerApplicationRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

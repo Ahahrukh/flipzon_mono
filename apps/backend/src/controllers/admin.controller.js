@@ -4,6 +4,7 @@ import Product from "../models/Product.js";
 import Ticket from "../models/Ticket.js";
 import User from "../models/User.js";
 import WithdrawalRequest from "../models/WithdrawalRequest.js";
+export { listPartnerApplications, updatePartnerApplication } from "./partnerApplication.controller.js";
 import { notify } from "../services/notification.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
