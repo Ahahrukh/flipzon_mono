@@ -1,12 +1,29 @@
 import Earning from "../models/Earning.js";
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
+import User from "../models/User.js";
 import { notify } from "../services/notification.service.js";
 import { createPaymentOrder, verifyPaymentSignature } from "../services/razorpay.service.js";
+import { calculateRouteEta, geocodeAddress } from "../services/map.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+
+const distanceKm = (from, to) => {
+  if (!from?.lat || !from?.lng || !to?.lat || !to?.lng) return Number.POSITIVE_INFINITY;
+  const earthRadiusKm = 6371;
+  const latDelta = ((to.lat - from.lat) * Math.PI) / 180;
+  const lngDelta = ((to.lng - from.lng) * Math.PI) / 180;
+  const firstLat = (from.lat * Math.PI) / 180;
+  const secondLat = (to.lat * Math.PI) / 180;
+  const a = Math.sin(latDelta / 2) ** 2 + Math.cos(firstLat) * Math.cos(secondLat) * Math.sin(lngDelta / 2) ** 2;
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
 
 export const createOrder = asyncHandler(async (req, res) => {
   const { items, address } = req.body;
+  if (!Array.isArray(items) || items.length === 0) {
+    res.status(400);
+    throw new Error("Order must include at least one item");
+  }
   const ids = items.map((item) => item.product);
   const products = await Product.find({ _id: { $in: ids }, status: "active" });
 
@@ -25,7 +42,9 @@ export const createOrder = asyncHandler(async (req, res) => {
   const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const discount = req.user.referralDiscountAvailable ? Math.round(subtotal * 0.2) : 0;
   const total = Math.max(subtotal - discount, 0);
-  const paymentOrder = await createPaymentOrder({ amount: total, receipt: `flipzon_${Date.now()}` });
+  const paymentOrder = await createPaymentOrder({ amount: total, receipt: `VDelivery_${Date.now()}` });
+  const customerCoordinates = await geocodeAddress(address);
+  const initialRoute = await calculateRouteEta({ customer: customerCoordinates });
 
   const order = await Order.create({
     user: req.user._id,
@@ -34,7 +53,12 @@ export const createOrder = asyncHandler(async (req, res) => {
     discount,
     total,
     payment: { razorpayOrderId: paymentOrder.id },
-    delivery: { address }
+    delivery: {
+      address: { ...address, coordinates: customerCoordinates },
+      etaMinutes: Math.ceil(initialRoute.durationSeconds / 60),
+      distanceMeters: initialRoute.distanceMeters,
+      durationSeconds: initialRoute.durationSeconds
+    }
   });
 
   await notify({
@@ -43,6 +67,24 @@ export const createOrder = asyncHandler(async (req, res) => {
     message: `Order ${order._id} is waiting for payment confirmation.`,
     data: { orderId: order._id }
   });
+  const deliveryPartners = await User.find({ role: "delivery_partner", isActive: true }).select("address");
+  const nearbyPartners = deliveryPartners.filter((partner) => distanceKm(partner.address?.coordinates, customerCoordinates) <= 10);
+  const deliveryNotification = {
+    title: "New nearby delivery request",
+    message: `Order ${order._id.toString().slice(-8)} is ready for pickup.`,
+    type: "delivery_request",
+    data: {
+      orderId: order._id,
+      customerLocation: customerCoordinates,
+      etaMinutes: order.delivery.etaMinutes,
+      distanceMeters: order.delivery.distanceMeters
+    }
+  };
+  if (nearbyPartners.length > 0) {
+    await Promise.all(nearbyPartners.map((partner) => notify({ ...deliveryNotification, recipient: partner._id })));
+  } else {
+    await notify({ ...deliveryNotification, role: "delivery_partner" });
+  }
 
   res.status(201).json({ order, razorpayOrder: paymentOrder });
 });
@@ -95,32 +137,21 @@ export const myOrders = asyncHandler(async (req, res) => {
   res.json({ orders });
 });
 
-export const trackOrder = async (req, res) => {
-  try {
-      const { riderLat, riderLng, customerLat, customerLng } = req.body;
-
-      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-
-      const url = `https://maps.googleapis.com/maps/api/distancematrix/json`;
-
-      const response = await axios.get(url, {
-        params: {
-          origins: `${riderLat},${riderLng}`,
-          destinations: `${customerLat},${customerLng}`,
-          mode: "driving",
-          key: apiKey,
-        },
-      });
-
-      const element = response.data.rows[0].elements[0];
-
-      return res.json({
-        distance: element.distance.text,
-        duration: element.duration.text,
-        etaSeconds: element.duration.value,
-      });
-  }catch (error) {
-    res.status(500);
-    throw new Error("Tracking service unavailable");
+export const trackOrder = asyncHandler(async (req, res) => {
+  const { riderLat, riderLng, customerLat, customerLng } = req.body;
+  if ([riderLat, riderLng, customerLat, customerLng].some((value) => Number.isNaN(Number(value)))) {
+    res.status(400);
+    throw new Error("Valid rider and customer coordinates are required");
   }
-}
+
+  const route = await calculateRouteEta({
+    rider: { lat: Number(riderLat), lng: Number(riderLng) },
+    customer: { lat: Number(customerLat), lng: Number(customerLng) }
+  });
+
+  res.json({
+    distance: `${(route.distanceMeters / 1000).toFixed(1)} km`,
+    duration: `${Math.ceil(route.durationSeconds / 60)} mins`,
+    etaSeconds: route.durationSeconds
+  });
+});

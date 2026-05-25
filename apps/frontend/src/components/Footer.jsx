@@ -4,7 +4,7 @@ export default function Footer() {
   return (
     <footer className="footer">
       <div className="footerBrand">
-        <strong>Flipzon</strong>
+        <strong>VDelivery</strong>
         <p>Quick commerce with cart checkout, referrals, support tickets, notifications, seller requests, and delivery partner requests.</p>
       </div>
       <nav className="footerColumns">

@@ -1,4 +1,4 @@
-import { Minus, Plus, Trash2 } from "lucide-react";
+import { LocateFixed, Minus, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -6,12 +6,16 @@ import Footer from "../components/Footer.jsx";
 import Header from "../components/Header.jsx";
 import { clearCart, decrementQuantity, incrementQuantity, removeFromCart } from "../features/cart/cartSlice.js";
 import { apiRequest } from "../services/api.js";
+import { getCurrentLocation } from "../utils/location.js";
 
 export default function Cart() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [isPaying, setIsPaying] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
+  const [locationStatus, setLocationStatus] = useState("Optional: use current location for more accurate ETA.");
+  const [address, setAddress] = useState({ line1: "Bandra West", city: "Mumbai", state: "Maharashtra", pincode: "400050", coordinates: null });
   const items = useSelector((state) => state.cart.items);
   const user = useSelector((state) => state.auth.user);
   const token = useSelector((state) => state.auth.token);
@@ -19,9 +23,22 @@ export default function Cart() {
   const referralDiscount = subtotal > 0 ? Math.round(subtotal * 0.2) : 0;
   const deliveryFee = subtotal > 499 || subtotal === 0 ? 0 : 25;
   const total = subtotal - referralDiscount + deliveryFee;
+
+  const captureLocation = useCallback(async () => {
+    setIsLocating(true);
+    try {
+      const coordinates = await getCurrentLocation({ onStatus: setLocationStatus });
+      setAddress((current) => ({ ...current, coordinates }));
+      setLocationStatus(`Location captured: ${coordinates.lat.toFixed(4)}, ${coordinates.lng.toFixed(4)}`);
+      return coordinates;
+    } finally {
+      setIsLocating(false);
+    }
+  }, []);
+
   const handlePay = useCallback(async () => {
     if (!user) {
-      sessionStorage.setItem("flipzon_pending_checkout", "1");
+      sessionStorage.setItem("VDelivery_pending_checkout", "1");
       navigate("/login?redirect=/cart&checkout=1");
       return;
     }
@@ -36,9 +53,8 @@ export default function Cart() {
           items: items.map((item) => ({ product: item.id, quantity: item.quantity })),
           address: {
             label: "Home",
-            line1: "Bandra West",
-            city: "Mumbai",
-            coordinates: { lat: 19.0596, lng: 72.8295 }
+            ...address,
+            ...(address.coordinates ? { coordinates: address.coordinates } : {})
           }
         })
       });
@@ -49,12 +65,12 @@ export default function Cart() {
     } finally {
       setIsPaying(false);
     }
-  }, [dispatch, items, navigate, token, user]);
+  }, [address, captureLocation, dispatch, items, navigate, token, user]);
 
   useEffect(() => {
-    const shouldResume = sessionStorage.getItem("flipzon_pending_checkout") === "1";
+    const shouldResume = sessionStorage.getItem("VDelivery_pending_checkout") === "1";
     if (user && shouldResume && items.length > 0) {
-      sessionStorage.removeItem("flipzon_pending_checkout");
+      sessionStorage.removeItem("VDelivery_pending_checkout");
       handlePay();
     }
   }, [handlePay, items.length, user]);
@@ -117,6 +133,24 @@ export default function Cart() {
               <div><span>Referral discount 20%</span><strong>- Rs {referralDiscount}</strong></div>
               <div><span>Delivery fee</span><strong>Rs {deliveryFee}</strong></div>
               <div className="totalLine"><span>Total</span><strong>Rs {total}</strong></div>
+              <div className="addressBox">
+                <h3>Delivery address</h3>
+                <input value={address.line1} onChange={(event) => setAddress((current) => ({ ...current, line1: event.target.value }))} placeholder="Area / street" />
+                <input value={address.city} onChange={(event) => setAddress((current) => ({ ...current, city: event.target.value }))} placeholder="City" />
+                <input value={address.state} onChange={(event) => setAddress((current) => ({ ...current, state: event.target.value }))} placeholder="State" />
+                <input value={address.pincode} onChange={(event) => setAddress((current) => ({ ...current, pincode: event.target.value }))} placeholder="Pincode" />
+                <button className="secondaryButton locationButton" type="button" disabled={isLocating} onClick={() => {
+                  setCheckoutError("");
+                  captureLocation().catch((error) => {
+                    setLocationStatus("Typed address will be used for delivery ETA.");
+                    setCheckoutError(error.message);
+                  });
+                }}>
+                  <LocateFixed size={17} />
+                  {isLocating ? "Getting location..." : "Use my current location"}
+                </button>
+                <p className={address.coordinates ? "geoStatus success" : "geoStatus"}>{locationStatus}</p>
+              </div>
               <button className="primaryButton payButton" onClick={handlePay} disabled={isPaying}>
                 {isPaying && <span className="buttonSpinner" />}
                 {isPaying ? "Creating order..." : "Proceed to pay"}

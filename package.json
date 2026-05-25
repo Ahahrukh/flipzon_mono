@@ -1,5 +1,5 @@
 {
-  "name": "flipzon-mono",
+  "name": "VDelivery-mono",
   "version": "1.0.0",
   "private": true,
   "workspaces": [
@@ -11,5 +11,9 @@
     "dev:backend": "npm run dev -w apps/backend",
     "build": "npm run build --workspaces",
     "lint": "npm run lint --workspaces"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "react-leaflet": "^5.0.0"
   }
 }

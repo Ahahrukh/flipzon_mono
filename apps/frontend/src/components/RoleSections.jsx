@@ -13,7 +13,7 @@ const roleSections = [
   {
     role: "seller",
     title: "Become a seller",
-    body: "Apply to sell products on Flipzon. Admin will review and manually update your role after approval.",
+    body: "Apply to sell products on VDelivery. Admin will review and manually update your role after approval.",
     Icon: PackagePlus
   },
   {

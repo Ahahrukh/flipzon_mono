@@ -17,8 +17,20 @@ io.on("connection", (socket) => {
 
 setSocketServer(io);
 
+server.on("error", (error) => {
+  console.error("HTTP server error:", error.message);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught exception:", error);
+});
+
 server.listen(env.port, () => {
-  console.log(`Flipzon API listening on http://localhost:${env.port}`);
+  console.log(`VDelivery API listening on http://localhost:${env.port}`);
 });
 
 connectDb().catch((error) => {

@@ -1,7 +1,7 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { apiRequest } from "../../services/api.js";
 
-const savedSession = JSON.parse(localStorage.getItem("flipzon_session") || "null");
+const savedSession = JSON.parse(localStorage.getItem("VDelivery_session") || "null");
 
 const initialState = {
   user: savedSession?.user || null,
@@ -34,7 +34,7 @@ const authSlice = createSlice({
       state.token = action.payload.token;
       state.role = action.payload.user?.role || "user";
       state.error = "";
-      localStorage.setItem("flipzon_session", JSON.stringify(action.payload));
+      localStorage.setItem("VDelivery_session", JSON.stringify(action.payload));
     },
     logout(state) {
       state.user = null;
@@ -42,7 +42,7 @@ const authSlice = createSlice({
       state.role = "user";
       state.status = "idle";
       state.error = "";
-      localStorage.removeItem("flipzon_session");
+      localStorage.removeItem("VDelivery_session");
     },
     previewRole(state, action) {
       state.role = action.payload;
@@ -59,7 +59,7 @@ const authSlice = createSlice({
         state.user = action.payload.user;
         state.token = action.payload.token;
         state.role = action.payload.user.role;
-        localStorage.setItem("flipzon_session", JSON.stringify(action.payload));
+        localStorage.setItem("VDelivery_session", JSON.stringify(action.payload));
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.status = "error";
@@ -74,7 +74,7 @@ const authSlice = createSlice({
         state.user = action.payload.user;
         state.token = action.payload.token;
         state.role = action.payload.user.role;
-        localStorage.setItem("flipzon_session", JSON.stringify(action.payload));
+        localStorage.setItem("VDelivery_session", JSON.stringify(action.payload));
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.status = "error";

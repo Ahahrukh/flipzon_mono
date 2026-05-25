@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useEffect, useState } from "react";
 import { logout, setSession } from "../features/auth/authSlice.js";
 import { apiRequest } from "../services/api.js";
+import logo from '../../pictures/v_delivery_logo.png'
 
 export default function Header() {
   const dispatch = useDispatch();
@@ -39,7 +40,7 @@ export default function Header() {
   const submitSearch = (event) => {
     event.preventDefault();
     const query = searchValue.trim();
-    window.dispatchEvent(new CustomEvent("flipzon:search", { detail: query }));
+    window.dispatchEvent(new CustomEvent("VDelivery:search", { detail: query }));
     navigate(query ? `/?q=${encodeURIComponent(query)}` : "/");
   };
 
@@ -56,8 +57,10 @@ export default function Header() {
   return (
     <header className="topbar">
       <Link to="/" className="brand">
-        <span className="brandMark">FZ</span>
-        <span>Flipzon</span>
+        <img src={logo} alt="VDelivery" className="brandLogo" />
+        <span className="brandText">
+          <span className="brandV">V</span>Delivery
+        </span>
       </Link>
       <div className="location">
         <MapPin size={18} />
@@ -71,7 +74,7 @@ export default function Header() {
           value={searchValue}
           onChange={(event) => {
             setSearchValue(event.target.value);
-            window.dispatchEvent(new CustomEvent("flipzon:search", { detail: event.target.value }));
+            window.dispatchEvent(new CustomEvent("VDelivery:search", { detail: event.target.value }));
           }}
           placeholder="Search milk, mango, chips, atta..."
         />

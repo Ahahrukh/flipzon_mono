@@ -5,6 +5,7 @@ import Footer from "../components/Footer.jsx";
 import Header from "../components/Header.jsx";
 import LiveMap from "../components/LiveMap.jsx";
 import { apiRequest } from "../services/api.js";
+import { getCurrentLocation } from "../utils/location.js";
 
 const money = (value = 0) => `Rs ${Math.round(value)}`;
 
@@ -12,7 +13,8 @@ export default function RoleConsole() {
   const { token, user } = useSelector((state) => state.auth);
   const [searchParams] = useSearchParams();
   const role = user?.role || "user";
-  const [message, setMessage] = useState("");
+  const [message, setMessageState] = useState({ text: "", type: "success" });
+  const setMessage = (text, type = "success") => setMessageState({ text, type });
 
   return (
     <main>
@@ -33,7 +35,7 @@ export default function RoleConsole() {
           </div>
         )}
 
-        {message && <p className="formSuccess">{message}</p>}
+        {message.text && <p className={message.type === "error" ? "formError" : "formSuccess"}>{message.text}</p>}
         {role === "admin" && <AdminConsole token={token} setMessage={setMessage} />}
         {role === "seller" && <SellerConsole token={token} setMessage={setMessage} />}
         {role === "delivery_partner" && <DeliveryConsole token={token} setMessage={setMessage} />}
@@ -47,18 +49,23 @@ export default function RoleConsole() {
 function UserConsole({ user, token, initialTab, initialOrderId, setMessage }) {
   const [tab, setTab] = useState(initialTab === "orders" ? "orders" : "dashboard");
   const [orders, setOrders] = useState([]);
+  const [tickets, setTickets] = useState([]);
   const [selectedOrderId, setSelectedOrderId] = useState(initialOrderId || "");
   const selectedOrder = useMemo(() => orders.find((order) => order._id === selectedOrderId) || orders[0], [orders, selectedOrderId]);
 
   const loadOrders = async () => {
     if (!token) return;
-    const data = await apiRequest("/orders/mine", { token });
+    const [data, ticketData] = await Promise.all([
+      apiRequest("/orders/mine", { token }),
+      apiRequest("/tickets", { token })
+    ]);
     setOrders(data.orders || []);
+    setTickets(ticketData.tickets || []);
     if (!selectedOrderId && data.orders?.[0]) setSelectedOrderId(data.orders[0]._id);
   };
 
   useEffect(() => {
-    if (token) loadOrders().catch((error) => setMessage(error.message));
+    if (token) loadOrders().catch((error) => setMessage(error.message, "error"));
   }, [token]);
 
   useEffect(() => {
@@ -89,6 +96,11 @@ function UserConsole({ user, token, initialTab, initialOrderId, setMessage }) {
           <article className="consoleCard">
             <h2>Referral</h2>
             <p>Your code: {user?.referralCode || "Login to generate code"}</p>
+          </article>
+          <article className="consoleCard">
+            <h2>Tickets</h2>
+            <p>{tickets.length} support tickets</p>
+            <button onClick={() => setTab("tickets")}>Raise ticket</button>
           </article>
         </div>
       )}
@@ -138,8 +150,59 @@ function UserConsole({ user, token, initialTab, initialOrderId, setMessage }) {
       )}
 
       {tab === "referral" && <article className="opsPanel wide"><h2>Referral</h2><p>Your code: {user?.referralCode || "Login to generate code"}</p></article>}
-      {tab === "tickets" && <article className="opsPanel wide"><h2>Tickets</h2><p>Support ticket creation is available from the order flow.</p></article>}
+      {tab === "tickets" && <TicketPanel token={token} orders={orders} tickets={tickets} setTickets={setTickets} setMessage={setMessage} />}
     </>
+  );
+}
+
+function TicketPanel({ token, orders = [], tickets = [], setTickets, setMessage }) {
+  const [ticket, setTicket] = useState({ subject: "", message: "", order: "" });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const loadTickets = async () => {
+    const data = await apiRequest("/tickets", { token });
+    setTickets(data.tickets || []);
+  };
+
+  const submitTicket = async (event) => {
+    event.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const payload = { ...ticket };
+      if (!payload.order) delete payload.order;
+      await apiRequest("/tickets", { method: "POST", token, body: JSON.stringify(payload) });
+      setTicket({ subject: "", message: "", order: "" });
+      setMessage("Support ticket raised.");
+      await loadTickets();
+    } catch (error) {
+      setMessage(error.message, "error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="opsGrid ticketGrid">
+      <form className="opsPanel" onSubmit={submitTicket}>
+        <h2>Raise ticket</h2>
+        <input value={ticket.subject} onChange={(event) => setTicket((current) => ({ ...current, subject: event.target.value }))} placeholder="Issue subject" required />
+        <textarea value={ticket.message} onChange={(event) => setTicket((current) => ({ ...current, message: event.target.value }))} placeholder="Explain the issue" required />
+        {orders.length > 0 && (
+          <select value={ticket.order} onChange={(event) => setTicket((current) => ({ ...current, order: event.target.value }))}>
+            <option value="">No order selected</option>
+            {orders.map((order) => <option key={order._id} value={order._id}>Order #{order._id.slice(-8)}</option>)}
+          </select>
+        )}
+        <button className="primaryButton" disabled={isSubmitting}>{isSubmitting ? "Submitting..." : "Submit ticket"}</button>
+      </form>
+      <article className="opsPanel wide">
+        <h2>Ticket list</h2>
+        <div className="opsList">
+          {tickets.map((item) => <span key={item._id}>{item.subject} · {item.status} · {new Date(item.createdAt).toLocaleDateString()}</span>)}
+          {tickets.length === 0 && <span>No tickets yet.</span>}
+        </div>
+      </article>
+    </div>
   );
 }
 
@@ -178,7 +241,7 @@ function AdminConsole({ token, setMessage }) {
   };
 
   useEffect(() => {
-    if (token) load().catch((error) => setMessage(error.message));
+    if (token) load().catch((error) => setMessage(error.message, "error"));
   }, [token, applicationStatus]);
 
   const createOffer = async (event) => {
@@ -305,6 +368,7 @@ function SellerConsole({ token, setMessage }) {
   const [products, setProducts] = useState([]);
   const [earnings, setEarnings] = useState({ summary: { grossAmount: 0, netAmount: 0 }, rows: [] });
   const [withdrawals, setWithdrawals] = useState([]);
+  const [tickets, setTickets] = useState([]);
   const [withdrawalStatus, setWithdrawalStatus] = useState("");
   const [product, setProduct] = useState({ name: "", sku: "", category: "Fruits", price: 1, stock: 1, unit: "piece" });
   const [editingId, setEditingId] = useState("");
@@ -312,18 +376,20 @@ function SellerConsole({ token, setMessage }) {
   const [csvFile, setCsvFile] = useState(null);
 
   const load = async () => {
-    const [productData, earningData, withdrawalData] = await Promise.all([
+    const [productData, earningData, withdrawalData, ticketData] = await Promise.all([
       apiRequest("/seller/products", { token }),
       apiRequest("/seller/earnings", { token }),
-      apiRequest(`/seller/withdrawals${withdrawalStatus ? `?status=${withdrawalStatus}` : ""}`, { token })
+      apiRequest(`/seller/withdrawals${withdrawalStatus ? `?status=${withdrawalStatus}` : ""}`, { token }),
+      apiRequest("/tickets", { token })
     ]);
     setProducts(productData.products || []);
     setEarnings(earningData);
     setWithdrawals(withdrawalData.withdrawals || []);
+    setTickets(ticketData.tickets || []);
   };
 
   useEffect(() => {
-    if (token) load().catch((error) => setMessage(error.message));
+    if (token) load().catch((error) => setMessage(error.message, "error"));
   }, [token, withdrawalStatus]);
 
   const addProduct = async (event) => {
@@ -379,7 +445,7 @@ function SellerConsole({ token, setMessage }) {
   return (
     <>
       <div className="sellerTabs">
-        {["dashboard", "products", "earnings", "withdrawals", "csv"].map((item) => (
+        {["dashboard", "products", "earnings", "withdrawals", "csv", "tickets"].map((item) => (
           <button className={tab === item ? "active" : ""} key={item} onClick={() => setTab(item)}>{item}</button>
         ))}
       </div>
@@ -390,6 +456,7 @@ function SellerConsole({ token, setMessage }) {
           <article className="opsPanel"><h2>Total earning</h2><p>{money(earnings.summary?.netAmount)}</p><button onClick={() => setTab("earnings")}>Open earnings page</button></article>
           <article className="opsPanel"><h2>Withdrawals</h2><p>{withdrawals.length} requests</p><button onClick={() => setTab("withdrawals")}>View withdrawals</button></article>
           <article className="opsPanel"><h2>CSV upload</h2><p>Bulk import product catalog.</p><button onClick={() => setTab("csv")}>Upload CSV</button></article>
+          <article className="opsPanel"><h2>Tickets</h2><p>{tickets.length} support tickets</p><button onClick={() => setTab("tickets")}>Raise ticket</button></article>
         </div>
       )}
 
@@ -452,23 +519,34 @@ function SellerConsole({ token, setMessage }) {
           <button className="primaryButton">Upload file</button>
         </form>
       )}
+      {tab === "tickets" && <TicketPanel token={token} tickets={tickets} setTickets={setTickets} setMessage={setMessage} />}
     </>
   );
 }
 
 function DeliveryConsole({ token, setMessage }) {
   const [tab, setTab] = useState("dashboard");
+  const [availableOrders, setAvailableOrders] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [tickets, setTickets] = useState([]);
+  const [isAccepting, setIsAccepting] = useState("");
+  const [isLocating, setIsLocating] = useState(false);
   const [location, setLocation] = useState({ orderId: "", lat: "19.0596", lng: "72.8295", etaMinutes: 12 });
   const assignedOrder = useMemo(() => orders.find((order) => order._id === location.orderId), [location.orderId, orders]);
 
   const load = async () => {
-    const data = await apiRequest("/delivery/orders", { token });
+    const [data, requestData, ticketData] = await Promise.all([
+      apiRequest("/delivery/orders", { token }),
+      apiRequest("/delivery/available-orders", { token }),
+      apiRequest("/tickets", { token })
+    ]);
     setOrders(data.orders || []);
+    setAvailableOrders(requestData.orders || []);
+    setTickets(ticketData.tickets || []);
   };
 
   useEffect(() => {
-    if (token) load().catch((error) => setMessage(error.message));
+    if (token) load().catch((error) => setMessage(error.message, "error"));
   }, [token]);
 
   const updateLocation = async (event) => {
@@ -486,19 +564,85 @@ function DeliveryConsole({ token, setMessage }) {
     await load();
   };
 
+  const useCurrentLocation = async () => {
+    setIsLocating(true);
+    try {
+      const coordinates = await getCurrentLocation({ onStatus: (status) => setMessage(status) });
+      setLocation((current) => ({ ...current, lat: String(coordinates.lat), lng: String(coordinates.lng) }));
+      setMessage("Current location captured.");
+    } catch (error) {
+      setMessage(error.message, "error");
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  const acceptOrder = async (orderId) => {
+    setIsAccepting(orderId);
+    let coordinates = null;
+    try {
+      coordinates = await getCurrentLocation({ onStatus: (status) => setMessage(status) });
+    } catch (error) {
+      setMessage(`${error.message} Accepting with saved partner location.`, "error");
+    }
+
+    try {
+      await apiRequest(`/delivery/orders/${orderId}/accept`, {
+        method: "PATCH",
+        token,
+        body: JSON.stringify(coordinates || {})
+      });
+      if (coordinates) {
+        setLocation((current) => ({ ...current, orderId, lat: String(coordinates.lat), lng: String(coordinates.lng) }));
+      } else {
+        setLocation((current) => ({ ...current, orderId }));
+      }
+      setMessage("Order accepted. Customer can now see your live ETA.");
+      setTab("active");
+      await load();
+    } catch (error) {
+      setMessage(error.message, "error");
+    } finally {
+      setIsAccepting("");
+    }
+  };
+
   return (
     <>
       <div className="sellerTabs">
-        {["dashboard", "assigned", "active", "location", "history", "notifications"].map((item) => (
+        {["dashboard", "requests", "assigned", "active", "location", "history", "tickets", "notifications"].map((item) => (
           <button className={tab === item ? "active" : ""} key={item} onClick={() => setTab(item)}>{item}</button>
         ))}
       </div>
       {tab === "dashboard" && (
         <div className="opsGrid">
+          <article className="opsPanel"><h2>New requests</h2><p>{availableOrders.length}</p><button onClick={() => setTab("requests")}>Review requests</button></article>
           <article className="opsPanel"><h2>Assigned orders</h2><p>{orders.length}</p><button onClick={() => setTab("assigned")}>Open assignments</button></article>
           <article className="opsPanel"><h2>Active delivery</h2><p>{orders.filter((order) => order.delivery?.status === "out_for_delivery").length}</p><button onClick={() => setTab("active")}>View active</button></article>
           <article className="opsPanel"><h2>Location</h2><p>Update lat, lng and ETA for selected order.</p><button onClick={() => setTab("location")}>Update location</button></article>
+          <article className="opsPanel"><h2>Tickets</h2><p>{tickets.length} support tickets</p><button onClick={() => setTab("tickets")}>Raise ticket</button></article>
         </div>
+      )}
+      {tab === "requests" && (
+        <article className="opsPanel wide">
+          <h2>Nearby delivery requests</h2>
+          <p>Accepting asks for your current location, assigns the order, and starts customer ETA tracking.</p>
+          <div className="requestList">
+            {availableOrders.map((order) => (
+              <div className="requestCard" key={order._id}>
+                <div>
+                  <strong>#{order._id.slice(-8)} · {money(order.total)}</strong>
+                  <span>{order.items?.map((item) => `${item.name} x${item.quantity}`).join(", ")}</span>
+                  <small>{order.delivery?.address?.line1 || "Customer address"} · ETA {order.delivery?.etaMinutes || 12} min</small>
+                </div>
+                <button className="primaryButton" onClick={() => acceptOrder(order._id)} disabled={isAccepting === order._id}>
+                  {isAccepting === order._id ? "Getting location..." : "Accept order"}
+                </button>
+              </div>
+            ))}
+            {availableOrders.length === 0 && <span>No pending delivery requests.</span>}
+          </div>
+        </article>
       )}
       {tab === "assigned" && <DeliveryOrderList orders={orders} setLocation={setLocation} />}
       {tab === "active" && <DeliveryOrderList orders={orders.filter((order) => order.delivery?.status === "out_for_delivery")} setLocation={setLocation} />}
@@ -512,10 +656,14 @@ function DeliveryConsole({ token, setMessage }) {
           <input value={location.lat} onChange={(e) => setLocation((current) => ({ ...current, lat: e.target.value }))} placeholder="Latitude" />
           <input value={location.lng} onChange={(e) => setLocation((current) => ({ ...current, lng: e.target.value }))} placeholder="Longitude" />
           <input type="number" value={location.etaMinutes} onChange={(e) => setLocation((current) => ({ ...current, etaMinutes: Number(e.target.value) }))} />
+          <button className="secondaryButton locationButton" type="button" onClick={useCurrentLocation} disabled={isLocating}>
+            {isLocating ? "Getting current location..." : "Use my current location"}
+          </button>
           <button className="primaryButton">Send location</button>
         </form>
       )}
       {tab === "history" && <DeliveryOrderList orders={orders.filter((order) => ["delivered", "cancelled"].includes(order.delivery?.status))} setLocation={setLocation} />}
+      {tab === "tickets" && <TicketPanel token={token} orders={orders} tickets={tickets} setTickets={setTickets} setMessage={setMessage} />}
       {tab === "notifications" && <article className="opsPanel wide"><h2>Notifications</h2><p>Pickup, drop, and location update notifications arrive in real-time via Socket.IO.</p></article>}
       {assignedOrder && <article className="opsPanel wide"><h2>Selected assignment</h2><p>{assignedOrder._id.slice(-8)} · {assignedOrder.items?.length || 0} items · {assignedOrder.delivery?.status}</p></article>}
     </>

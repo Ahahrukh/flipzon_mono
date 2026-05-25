@@ -34,7 +34,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 500 }));
 
-app.get("/health", (_req, res) => res.json({ status: "ok", service: "flipzon-api", database: isDbConnected() ? "connected" : "disconnected" }));
+app.get("/health", (_req, res) => res.json({ status: "ok", service: "VDelivery-api", database: isDbConnected() ? "connected" : "disconnected" }));
 if (swaggerPath) {
   const swaggerDocument = YAML.parse(fs.readFileSync(swaggerPath, "utf8"));
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));

@@ -1,4 +1,4 @@
-# Flipzon Mono
+# VDelivery Mono
 
 Quick-commerce monorepo with a React frontend and Node.js/Mongoose backend.
 

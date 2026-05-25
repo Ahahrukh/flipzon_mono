@@ -5,14 +5,14 @@ export const normalizeProduct = (product, index = 0) => ({
   price: product.price,
   mrp: product.mrp || product.price,
   category: product.category || "Other",
-  brand: product.brand || "Flipzon",
+  brand: product.brand || "VDelivery",
   seller: product.seller?.sellerProfile?.storeName || product.seller?.name || product.seller || "Seller",
   rating: product.rating || 4.5,
   stock: product.stock || 0,
   time: product.time || "12 min",
   emoji: product.emoji || product.name?.[0]?.toUpperCase() || "P",
   color: product.color || ["#ffe08a", "#b6f3ff", "#d7c3ff", "#ffd2b7"][index % 4],
-  description: product.description || "Fresh product from a Flipzon seller.",
+  description: product.description || "Fresh product from a VDelivery seller.",
   tags: product.tags || [],
   imageUrl: product.imageUrl || product.photo || ""
 });

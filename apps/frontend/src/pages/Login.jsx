@@ -43,7 +43,7 @@ export default function Login() {
           });
     const result = await dispatch(action);
     if (!result.error) {
-      if (pendingCheckout) sessionStorage.setItem("flipzon_pending_checkout", "1");
+      if (pendingCheckout) sessionStorage.setItem("VDelivery_pending_checkout", "1");
       navigate(redirectTo);
     }
   };
@@ -77,7 +77,7 @@ export default function Login() {
               </label>
               <label>
                 <span>Email</span>
-                <input name="email" value={form.email} onChange={update} placeholder="you@flipzon.com" />
+                <input name="email" value={form.email} onChange={update} placeholder="you@VDelivery.com" />
               </label>
               <label>
                 <span>Phone</span>
@@ -95,7 +95,7 @@ export default function Login() {
                   name="identifier"
                   value={form.identifier}
                   onChange={update}
-                  placeholder="you@flipzon.com or 9876543210"
+                  placeholder="you@VDelivery.com or 9876543210"
                   required
                 />
               </div>

@@ -45,8 +45,8 @@ export default function Dashboard() {
       setFilters((current) => ({ ...current, q: event.detail || "" }));
       shopRef.current?.scrollIntoView({ behavior: "smooth" });
     };
-    window.addEventListener("flipzon:search", handleSearch);
-    return () => window.removeEventListener("flipzon:search", handleSearch);
+    window.addEventListener("VDelivery:search", handleSearch);
+    return () => window.removeEventListener("VDelivery:search", handleSearch);
   }, []);
 
   useEffect(() => {

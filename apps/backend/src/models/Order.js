@@ -34,7 +34,9 @@ const orderSchema = new mongoose.Schema(
         lng: Number,
         updatedAt: Date
       },
-      etaMinutes: Number
+      etaMinutes: Number,
+      distanceMeters: Number,
+      durationSeconds: Number
     }
   },
   { timestamps: true }
