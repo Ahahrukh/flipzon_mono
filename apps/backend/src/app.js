@@ -16,6 +16,7 @@ import ticketRoutes from "./routes/ticket.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import deliveryRoutes from "./routes/delivery.routes.js";
 import partnerApplicationRoutes from "./routes/partnerApplication.routes.js";
+import chatRoutes from "./routes/chat.routes.js";
 import { env } from "./config/env.js";
 import { isDbConnected } from "./config/db.js";
 import { requireDb } from "./middleware/db.middleware.js";
@@ -26,9 +27,22 @@ const swaggerPath = [
   path.resolve(process.cwd(), "docs/swagger.yml"),
   path.resolve(process.cwd(), "../../docs/swagger.yml")
 ].find((candidate) => fs.existsSync(candidate));
+const localOrigins = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5174"
+];
+const allowedOrigins = new Set([...env.clientOrigins, ...localOrigins]);
 
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({ origin: env.clientUrl, credentials: true }));
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
@@ -49,6 +63,7 @@ app.use("/api/tickets", requireDb, ticketRoutes);
 app.use("/api/notifications", requireDb, notificationRoutes);
 app.use("/api/delivery", requireDb, deliveryRoutes);
 app.use("/api/partner-applications", requireDb, partnerApplicationRoutes);
+app.use("/api/chat", chatRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
